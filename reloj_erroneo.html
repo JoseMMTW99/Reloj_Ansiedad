@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reloj Ansiedad</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    background-color: #0d0d0d;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #timer {
+    color: #ff8a00;
+    font-family: 'Courier New', monospace;
+    font-size: 50vh;
+    font-weight: bold;
+    text-shadow: 0 0 20px #ff6600, 0 0 40px #ff8a00, 0 0 60px #ff6600;
+    transition: transform 0.5s ease-in-out;
+    user-select: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  #timer span {
+    transition: opacity 0.15s ease;
+  }
+
+  #controlBtn {
+  position: absolute;
+  left: 50%;
+  bottom: 20vh; /* 5% desde el fondo de la ventana */
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  font-size: 2.5rem;
+  background-color: #ff6600;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  }
+
+  #controlBtn:hover {
+    background-color: #ff8a00;
+  }
+</style>
+</head>
+<body>
+<div id="timer">
+  <span class="minutes">05</span><span class="colon">:</span><span class="seconds">00</span>
+</div>
+<button id="controlBtn"><i class="bi bi-play-fill"></i></button>
+
+<script>
+let totalSeconds = 5 * 60;
+const minutesEl = document.querySelector('.minutes');
+const secondsEl = document.querySelector('.seconds');
+const colonEl = document.querySelector('.colon');
+const timerEl = document.getElementById('timer');
+const controlBtn = document.getElementById('controlBtn');
+
+let skipNextTick = false;
+let actionRunning = false;
+let timerRunning = false;
+let timerInterval;
+let isPausedIcon = false;
+let segunderoVisible = true;
+
+let lastEvent = null;
+let sameEventCount = 0;
+let posX = 0, posY = 0;
+
+function updateDisplay() {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  minutesEl.textContent = String(minutes).padStart(2, '0');
+  secondsEl.textContent = String(seconds).padStart(2, '0');
+}
+
+// Parpadeo constante segundero
+function startBlinking() {
+  setInterval(() => {
+    segunderoVisible = !segunderoVisible;
+    secondsEl.style.opacity = segunderoVisible ? "1" : "0.3";
+  }, 500);
+}
+
+// Evento aleatorio: salto de tiempo + glitch visual o tiempo irreconocible
+function randomEvent() {
+  if (!timerRunning) return;
+  if (actionRunning) { setTimeout(randomEvent, 1000); return; }
+
+  actionRunning = true;
+
+  let eventType;
+  if (sameEventCount >= 2) {
+    eventType = lastEvent === "jump" ? "distortion" : "jump";
+    sameEventCount = 0;
+  } else {
+    eventType = Math.random() < 0.5 ? "jump" : "distortion";
+    if (eventType === lastEvent) sameEventCount++; else sameEventCount = 1;
+  }
+  lastEvent = eventType;
+
+  if (eventType === "jump") {
+    const jump = Math.floor(Math.random() * 181) - 90;
+    totalSeconds = Math.max(10, totalSeconds + jump);
+    updateDisplay();
+
+    const offsetX = Math.floor(Math.random() * 21) - 10;
+    const offsetY = Math.floor(Math.random() * 21) - 10;
+    const scale = 0.95 + Math.random() * 0.1;
+    timerEl.style.transform = `translate(calc(-50% + ${posX + offsetX}px), calc(-50% + ${posY + offsetY}px)) scale(${scale})`;
+    setTimeout(() => { 
+      timerEl.style.transform = `translate(calc(-50% + ${posX}px), calc(-50% + ${posY}px)) scale(1)`; 
+    }, 150);
+  } else {
+    let tempSeconds = totalSeconds;
+    const steps = 4;
+    for (let i=0; i<steps; i++){
+      setTimeout(()=>{
+        const change = Math.floor(Math.random()*11)-5;
+        let displaySeconds = Math.max(10, tempSeconds + change);
+        const minutes = Math.floor(displaySeconds / 60);
+        const seconds = displaySeconds % 60;
+        minutesEl.textContent = String(minutes).padStart(2,'0');
+        secondsEl.textContent = String(seconds).padStart(2,'0');
+      }, i*150);
+    }
+  }
+
+  setTimeout(()=>{actionRunning=false;},600);
+  const nextEvent = (10 + Math.random()*20)*1000;
+  setTimeout(randomEvent, nextEvent);
+}
+
+// Parpadeo aleatorio de componentes
+function randomComponentBlink() {
+  if (!timerRunning) return;
+  const components = [minutesEl, colonEl, secondsEl];
+  const blinkCount = Math.floor(Math.random()*3)+1;
+  const shuffled = components.sort(()=>0.5-Math.random());
+  const toBlink = shuffled.slice(0, blinkCount);
+
+  toBlink.forEach(el=>{
+    if (el!==secondsEl || Math.random()<0.5) el.style.opacity="0.2";
+  });
+  setTimeout(()=>{
+    toBlink.forEach(el=>{
+      if (el!==secondsEl || Math.random()<0.5) el.style.opacity="1";
+    });
+  },200);
+  const nextBlink = 5000 + Math.random()*20000;
+  setTimeout(randomComponentBlink,nextBlink);
+}
+
+// Movimiento acumulativo seguro
+function randomMove() {
+  if (!timerRunning) return;
+  const maxOffset = window.innerHeight*0.02;
+  let attempt=0, newX, newY;
+  do {
+    newX = posX + (Math.random()*2-1)*maxOffset;
+    newY = posY + (Math.random()*2-1)*maxOffset;
+    const rect = timerEl.getBoundingClientRect();
+    const left = rect.left + (newX - posX);
+    const right = rect.right + (newX - posX);
+    const top = rect.top + (newY - posY);
+    const bottom = rect.bottom + (newY - posY);
+    if (left>=0 && right<=window.innerWidth && top>=0 && bottom<=window.innerHeight) break;
+    attempt++;
+  } while(attempt<10);
+  posX = newX;
+  posY = newY;
+  timerEl.style.transform = `translate(calc(-50% + ${posX}px), calc(-50% + ${posY}px))`;
+  const nextMove = (20+Math.random()*20)*1000;
+  setTimeout(randomMove,nextMove);
+}
+
+function startTimer() {
+  if (timerRunning) return;
+  timerRunning = true;
+  timerInterval = setInterval(()=>{
+    if(skipNextTick){skipNextTick=false;updateDisplay();return;}
+    totalSeconds--;
+    if(totalSeconds<10) totalSeconds=10;
+    updateDisplay();
+  },1000);
+
+  setTimeout(randomEvent,(10+Math.random()*20)*1000);
+  setTimeout(randomComponentBlink,5000+Math.random()*20000);
+  setTimeout(randomMove,20000+Math.random()*20000);
+}
+
+controlBtn.addEventListener('click',()=>{
+  if(!timerRunning){
+    totalSeconds=5*60;
+    updateDisplay();
+    startTimer();
+    controlBtn.innerHTML='<i class="bi bi-pause-fill"></i>';
+    isPausedIcon=true;
+  } else {
+    const subtract = Math.floor(Math.random()*11)+10;
+    if(totalSeconds-subtract<10){
+      totalSeconds += Math.floor(Math.random()*61)+30;
+    } else totalSeconds -= subtract;
+    updateDisplay();
+    if(isPausedIcon){
+      controlBtn.innerHTML='<i class="bi bi-play-fill"></i>';
+    } else {
+      controlBtn.innerHTML='<i class="bi bi-pause-fill"></i>';
+    }
+    isPausedIcon=!isPausedIcon;
+  }
+});
+
+updateDisplay();
+startBlinking();
+</script>
+</body>
+</html>
